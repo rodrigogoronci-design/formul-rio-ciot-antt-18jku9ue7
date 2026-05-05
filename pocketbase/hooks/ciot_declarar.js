@@ -1,71 +1,79 @@
-// @deps zod@3.23.8, node-forge@1.3.1
 routerAdd(
   'POST',
   '/backend/v1/declarar-operacao-ciot',
   (e) => {
-    const { z } = require('zod')
-    const forge = require('node-forge')
-
     const body = e.requestInfo().body || {}
 
-    const schema = z.object({
-      requisicao_id: z.string().optional(),
-      id_operacao: z
-        .string()
-        .length(12)
-        .regex(/^[a-zA-Z0-9]+$/, 'Apenas alfanuméricos'),
-      tipo_operacao: z.number().int().min(1).max(3),
-      cpf_cnpj_contratado: z.string().min(1, 'Obrigatório'),
-      rntrc_contratado: z.string().min(1, 'Obrigatório'),
-      cpf_cnpj_contratante: z.string().min(1, 'Obrigatório'),
-      cpf_cnpj_destinatario: z.string().min(1, 'Obrigatório'),
-      valor_frete: z.number().or(z.string().transform(Number)),
-      data_declaracao: z.string().min(1, 'Obrigatório'),
-      data_inicio_viagem: z.string().min(1, 'Obrigatório'),
-      data_fim_viagem: z.string().min(1, 'Obrigatório'),
-      ambiente: z.string().min(1, 'Obrigatório'),
-      veiculos: z
-        .array(
-          z.object({
-            placa: z.string().length(7, 'Placa deve ter 7 caracteres'),
-            numero_eixos: z.number().or(z.string().transform(Number)),
-          }),
-        )
-        .min(1, 'Mínimo de 1 veículo'),
-      origem_destino: z.any().optional(),
-      dados_carga: z.any().optional(),
-      inf_pagamento: z.any().optional(),
-      certificado_pfx: z.string().min(1, 'Certificado ausente'),
-      senha_certificado: z.string().min(1, 'Senha ausente'),
-    })
+    const errors = {}
 
-    const result = schema.safeParse(body)
-    if (!result.success) {
-      const errors = {}
-      for (const issue of result.error.issues) {
-        errors[issue.path[0]] = new ValidationError(issue.code, issue.message)
+    if (!body.id_operacao || !/^[a-zA-Z0-9]{12}$/.test(String(body.id_operacao))) {
+      errors['id_operacao'] = new ValidationError(
+        'invalid_format',
+        'Apenas alfanuméricos com 12 caracteres',
+      )
+    }
+
+    const tipoOperacao = Number(body.tipo_operacao)
+    if (isNaN(tipoOperacao) || tipoOperacao < 1 || tipoOperacao > 3) {
+      errors['tipo_operacao'] = new ValidationError('invalid_range', 'Deve ser entre 1 e 3')
+    }
+
+    if (!body.cpf_cnpj_contratado)
+      errors['cpf_cnpj_contratado'] = new ValidationError('required', 'Obrigatório')
+    if (!body.rntrc_contratado)
+      errors['rntrc_contratado'] = new ValidationError('required', 'Obrigatório')
+    if (!body.cpf_cnpj_contratante)
+      errors['cpf_cnpj_contratante'] = new ValidationError('required', 'Obrigatório')
+    if (!body.cpf_cnpj_destinatario)
+      errors['cpf_cnpj_destinatario'] = new ValidationError('required', 'Obrigatório')
+
+    if (body.valor_frete === undefined || body.valor_frete === null) {
+      errors['valor_frete'] = new ValidationError('required', 'Obrigatório')
+    } else if (isNaN(Number(body.valor_frete))) {
+      errors['valor_frete'] = new ValidationError('invalid_number', 'Deve ser um número')
+    }
+
+    if (!body.data_declaracao)
+      errors['data_declaracao'] = new ValidationError('required', 'Obrigatório')
+    if (!body.data_inicio_viagem)
+      errors['data_inicio_viagem'] = new ValidationError('required', 'Obrigatório')
+    if (!body.data_fim_viagem)
+      errors['data_fim_viagem'] = new ValidationError('required', 'Obrigatório')
+    if (!body.ambiente) errors['ambiente'] = new ValidationError('required', 'Obrigatório')
+
+    if (!Array.isArray(body.veiculos) || body.veiculos.length === 0) {
+      errors['veiculos'] = new ValidationError('required', 'Mínimo de 1 veículo')
+    } else {
+      for (const v of body.veiculos) {
+        if (!v.placa || String(v.placa).length !== 7) {
+          errors['veiculos'] = new ValidationError('invalid_length', 'Placa deve ter 7 caracteres')
+          break
+        }
       }
+    }
+
+    if (!body.certificado_pfx)
+      errors['certificado_pfx'] = new ValidationError('required', 'Certificado ausente')
+    if (!body.senha_certificado)
+      errors['senha_certificado'] = new ValidationError('required', 'Senha ausente')
+
+    if (Object.keys(errors).length > 0) {
       throw new BadRequestError('Dados inválidos. Verifique os campos e tente novamente.', errors)
     }
 
-    const data = result.data
-    const isHomologacao =
-      data.ambiente.toLowerCase() === 'homologacao' || data.ambiente.toLowerCase() === 'homologação'
-    const ambienteStr = isHomologacao ? 'homologacao' : 'producao'
-
-    // 1. Validate Certificate (In-Memory Processing)
-    try {
-      const p12Der = forge.util.decode64(data.certificado_pfx)
-      const p12Asn1 = forge.asn1.fromDer(p12Der)
-      forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, data.senha_certificado)
-    } catch (err) {
-      return e.json(401, {
-        sucesso: false,
-        erro: 'Certificado inválido ou expirado',
-        codigo: '401',
-        detalhes: err.message,
-      })
+    const data = {
+      ...body,
+      tipo_operacao: tipoOperacao,
+      valor_frete: Number(body.valor_frete),
+      veiculos: body.veiculos.map((v) => ({
+        placa: String(v.placa),
+        numero_eixos: Number(v.numero_eixos),
+      })),
     }
+
+    const isHomologacao =
+      String(data.ambiente).toLowerCase() === 'homologacao' ||
+      String(data.ambiente).toLowerCase() === 'homologação'
 
     // 2. Prepare ANTT Payload
     const anttPayload = {
