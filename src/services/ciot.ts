@@ -9,3 +9,10 @@ export const createLog = (data: any) => pb.collection('logs_requisicoes').create
 
 export const getRequisicoes = () =>
   pb.collection('requisicoes_ciot').getList(1, 50, { sort: '-created' })
+
+export const declararOperacao = (data: any) =>
+  pb.send('/backend/v1/declarar-operacao-ciot', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'application/json' },
+  })
