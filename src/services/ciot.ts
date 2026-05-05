@@ -10,6 +10,18 @@ export const createLog = (data: any) => pb.collection('logs_requisicoes').create
 export const getRequisicoes = () =>
   pb.collection('requisicoes_ciot').getList(1, 50, { sort: '-created' })
 
+export const getRequisicoesFiltered = (
+  page: number,
+  perPage: number,
+  filter: string,
+  sort: string,
+) => pb.collection('requisicoes_ciot').getList(page, perPage, { filter, sort })
+
+export const getLogsRequisicao = (requisicaoId: string) =>
+  pb
+    .collection('logs_requisicoes')
+    .getFullList({ filter: `requisicao_id = "${requisicaoId}"`, sort: '-created' })
+
 export const declararOperacao = (data: any) =>
   pb.send('/backend/v1/declarar-operacao-ciot', {
     method: 'POST',
