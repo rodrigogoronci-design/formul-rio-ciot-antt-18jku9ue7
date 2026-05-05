@@ -10,10 +10,27 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { FilePlus2, History, Settings, Truck, UserCircle } from 'lucide-react'
+import { FilePlus2, History, Settings, Truck, UserCircle, LogOut } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useNavigate } from 'react-router-dom'
 
 export default function Layout() {
   const location = useLocation()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSignOut = () => {
+    signOut()
+    navigate('/login')
+  }
 
   return (
     <SidebarProvider>
@@ -76,9 +93,28 @@ export default function Layout() {
               </span>
               API ANTT Conectada
             </div>
-            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border cursor-pointer hover:bg-slate-200 transition-colors">
-              <UserCircle className="w-5 h-5 text-slate-600" />
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border cursor-pointer hover:bg-slate-200 transition-colors">
+                  <UserCircle className="w-5 h-5 text-slate-600" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Minha Conta</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-rose-600 cursor-pointer focus:bg-rose-50 focus:text-rose-700"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="w-4 h-4 mr-2" /> Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-8">

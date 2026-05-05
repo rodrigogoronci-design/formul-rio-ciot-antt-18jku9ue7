@@ -6,10 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2, Trash2, Send, CheckCircle2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import { ciotSchema, defaultCiotValues, type CiotFormValues } from '@/lib/ciot-schema'
 import { DadosGeraisTab } from '@/components/ciot/DadosGeraisTab'
 import { LogisticaTab } from '@/components/ciot/LogisticaTab'
 import { FinanceiroTab } from '@/components/ciot/FinanceiroTab'
+import { createRequisicao, updateRequisicao, createLog } from '@/services/ciot'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 
 const geraisFields = [
   'idOperacao',
@@ -33,6 +36,7 @@ const financeiroFields = [
 
 export default function Index() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('gerais')
 
@@ -49,24 +53,91 @@ export default function Index() {
   const hasErrors = (fields: string[]) => fields.some((f) => errors[f as keyof CiotFormValues])
 
   const onSubmit = async (data: CiotFormValues) => {
+    if (!user) return
     setIsSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1500)) // Simula API ANTT
-    setIsSubmitting(false)
 
-    if (data.ambiente === 'Produção' && data.idOperacao === 'ERRO') {
+    try {
+      const formattedData = {
+        user_id: user.id,
+        id_operacao: data.idOperacao,
+        tipo_operacao: Number(data.tipoOperacao) || 1,
+        cpf_cnpj_contratado: data.contratado.replace(/\D/g, ''),
+        rntrc_contratado: data.rntrcContratado,
+        cpf_cnpj_contratante: data.contratante.replace(/\D/g, ''),
+        cpf_cnpj_destinatario: data.destinatario.replace(/\D/g, ''),
+        valor_frete: Number(data.valorFrete) || 0,
+        data_declaracao: data.dataDeclaracao
+          ? new Date(data.dataDeclaracao).toISOString()
+          : undefined,
+        data_inicio_viagem: data.dataInicio ? new Date(data.dataInicio).toISOString() : undefined,
+        data_fim_viagem: data.dataFim ? new Date(data.dataFim).toISOString() : undefined,
+        ambiente: data.ambiente.toLowerCase(),
+        status_requisicao: 'pendente',
+        veiculos_json: data.veiculos,
+      }
+
+      const req = await createRequisicao(formattedData)
+
+      await createLog({
+        user_id: user.id,
+        requisicao_id: req.id,
+        tipo_log: 'info',
+        mensagem: 'Iniciando validação ANTT...',
+        detalhes: { data: formattedData },
+      })
+
+      // Simula tempo de resposta da API ANTT
+      await new Promise((r) => setTimeout(r, 1500))
+
+      if (data.ambiente === 'Produção' && data.idOperacao === 'ERRO') {
+        await updateRequisicao(req.id, {
+          status_requisicao: 'erro',
+          erro_detalhado: 'ID da Operação rejeitado pela ANTT.',
+        })
+        await createLog({
+          user_id: user.id,
+          requisicao_id: req.id,
+          tipo_log: 'error',
+          mensagem: 'Falha na validação ANTT.',
+        })
+
+        toast({
+          title: 'Erro de Validação ANTT',
+          description: 'O ID da Operação foi rejeitado pelo servidor da ANTT.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const ciotGerado = Math.floor(100000000000 + Math.random() * 900000000000).toString()
+      await updateRequisicao(req.id, {
+        status_requisicao: 'sucesso',
+        ciot_gerado: ciotGerado,
+        protocolo: `PROT-${Date.now()}`,
+      })
+      await createLog({
+        user_id: user.id,
+        requisicao_id: req.id,
+        tipo_log: 'info',
+        mensagem: `CIOT gerado com sucesso: ${ciotGerado}`,
+      })
+
       toast({
-        title: 'Erro de Validação ANTT',
-        description: 'O ID da Operação foi rejeitado pelo servidor da ANTT.',
+        title: 'Formulário validado com sucesso',
+        description: `CIOT ${ciotGerado} gerado em ambiente de ${data.ambiente}.`,
+        className: 'bg-emerald-50 text-emerald-900 border-emerald-200',
+      })
+
+      form.reset(defaultCiotValues)
+    } catch (error) {
+      toast({
+        title: 'Erro de Sistema',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
-      return
+    } finally {
+      setIsSubmitting(false)
     }
-
-    toast({
-      title: 'Formulário validado com sucesso',
-      description: `CIOT gerado em ambiente de ${data.ambiente}.`,
-      className: 'bg-emerald-50 text-emerald-900 border-emerald-200',
-    })
   }
 
   const handleClear = () => {
