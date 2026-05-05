@@ -62,6 +62,15 @@ export const ciotSchema = z
 
     // Section 9: Ambiente
     ambiente: z.enum(['Homologação', 'Produção']).default('Homologação'),
+
+    // Section 10: Certificado
+    certificado: z
+      .any()
+      .refine((file) => file instanceof File, 'Certificado é obrigatório')
+      .refine(
+        (file) => file instanceof File && file.name.toLowerCase().endsWith('.pfx'),
+        'Formato de arquivo inválido. Por favor, selecione um arquivo .pfx',
+      ),
   })
   .superRefine((data, ctx) => {
     if (
@@ -105,4 +114,5 @@ export const defaultCiotValues: Partial<CiotFormValues> = {
   indAltoDesempenho: false,
   indRetornoVazio: false,
   indComposicaoVeicular: false,
+  certificado: undefined,
 }
