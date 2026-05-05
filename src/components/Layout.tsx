@@ -10,7 +10,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { FilePlus2, History, Settings, Truck, UserCircle, LogOut } from 'lucide-react'
+import { FilePlus2, History, BarChart3, Settings, Truck, UserCircle, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import {
   DropdownMenu,
@@ -62,6 +62,17 @@ export default function Layout() {
               >
                 <Link to="/historico">
                   <History className="w-4 h-4" /> <span>Histórico</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === '/relatorios'}
+                className="text-slate-300 hover:text-white hover:bg-slate-800 data-[active=true]:bg-slate-800 data-[active=true]:text-white mx-2 rounded-md mt-1"
+              >
+                <Link to="/relatorios">
+                  <BarChart3 className="w-4 h-4" /> <span>Relatórios</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

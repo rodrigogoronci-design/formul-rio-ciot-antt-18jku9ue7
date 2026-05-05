@@ -10,6 +10,7 @@ import RecoverPage from './pages/auth/RecoverPage'
 import Index from './pages/Index'
 import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
+import ReportsPage from './pages/ReportsPage'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
               <Route path="/historico" element={<HistoryPage />} />
+              <Route path="/relatorios" element={<ReportsPage />} />
               <Route path="/configuracoes" element={<SettingsPage />} />
             </Route>
           </Route>
